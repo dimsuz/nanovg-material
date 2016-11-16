@@ -3,10 +3,11 @@ import           Data.Bits hiding (rotate)
 import qualified Data.Set as S
 import           NanoVG as NVG
 import           Prelude hiding (init)
-import           Graphics.UI.GLFW hiding (Image)
+import           Graphics.UI.GLFW as GLFW hiding (Image)
 import           Control.Monad
 import           Control.Monad.Loops
 import           Graphics.GL.Core32
+import           System.Exit ( exitWith, ExitCode(..) )
 
 import           Foreign.C.Types
 import           Foreign.Ptr
@@ -31,6 +32,7 @@ main = do
          -- error handling? who needs that anyway
          swapInterval 0
          setTime 0
+         setKeyCallback w (Just keyPressed)
          whileM_ (not <$> windowShouldClose w) $
            do Just t <- getTime
               (mx,my) <- getCursorPos w
@@ -45,6 +47,17 @@ main = do
               endFrame c
               swapBuffers w
               pollEvents
+
+keyPressed :: KeyCallback
+keyPressed win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown win
+keyPressed _   _               _ _                     _ = return ()
+
+shutdown :: WindowCloseCallback
+shutdown win = do
+  GLFW.destroyWindow win
+  GLFW.terminate
+  _ <- exitWith ExitSuccess
+  return ()
 
 drawSpinner :: Context -> CFloat -> CFloat -> CFloat -> CFloat -> IO ()
 drawSpinner vg cx cy r t =
