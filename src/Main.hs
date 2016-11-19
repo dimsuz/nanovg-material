@@ -30,6 +30,8 @@ main = do
       do makeContextCurrent win
          glewInit
          glGetError
+         -- createGL2 is a function from a local nanovg fork (also on my github) modified
+         -- to run on GL2 instead of upstream version which runs on GL3
          c@(Context c') <- createGL2 (S.fromList [Antialias,StencilStrokes,Debug])
          -- error handling? who needs that anyway
          Just staticData <- runMaybeT $ loadStaticData c
