@@ -10,6 +10,9 @@ import           Control.Monad.Loops
 import           Control.Monad.Trans.Maybe
 import           Graphics.GL.Core32
 import           System.Exit ( exitWith, ExitCode(..) )
+import           Reactive.Banana as R
+import           Reactive.Banana.Frameworks
+import           Reactive.Banana.GLFW
 
 import           Foreign.C.Types
 import           Foreign.Ptr
