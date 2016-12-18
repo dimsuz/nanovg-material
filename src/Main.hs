@@ -44,8 +44,14 @@ main = do
          h <- windowHandler w
          network <- compile $ do
            keyE <- keyEvent h
+           mouseE <- mouseEvent h
+           closeE <- close h
+           cursor <- cursor h TopLeft
+           reactimate $ (\(x,y) -> drawControlPoint c (realToFrac x) (realToFrac y) 8) <$> cursorMove cursor
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
+           reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
+           reactimate $ print <$> mouseE
          actuate network
 
          forever $
@@ -60,6 +66,7 @@ main = do
               beginFrame c (fromIntegral width) (fromIntegral height) pxRatio
               drawSpinner c (fromIntegral fbWidth / 2) (fromIntegral fbHeight / 2) 20 (realToFrac t)
               drawRaisedButton c (fromIntegral fbWidth / 4) (fromIntegral fbHeight / 4) 88 36
+              drawControlPoint c 50 50 8
               endFrame c
               swapBuffers w
               pollEvents
@@ -77,6 +84,18 @@ shutdown win = do
   GLFW.terminate
   _ <- exitWith ExitSuccess
   return ()
+
+drawControlPoint :: Context -> CFloat -> CFloat -> CFloat -> IO ()
+drawControlPoint c x y r = do
+  beginPath c
+  circle c x y (r - 3)
+  fillColor c (rgba 128 0 0 255)
+  fill c
+  beginPath c
+  circle c x y r
+  strokeColor c (rgba 128 0 0 255)
+  strokeWidth c 2
+  stroke c
 
 drawRaisedButton :: Context -> CFloat -> CFloat -> CFloat -> CFloat -> IO ()
 drawRaisedButton c x y w h = do
