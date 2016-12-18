@@ -40,8 +40,15 @@ main = do
          Just staticData <- runMaybeT $ loadStaticData c
          swapInterval 0
          setTime 0
-         setKeyCallback w (Just keyPressed)
-         whileM_ (not <$> windowShouldClose w) $
+
+         h <- windowHandler w
+         network <- compile $ do
+           keyE <- keyEvent h
+           reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
+           reactimate $ print <$> keyE
+         actuate network
+
+         forever $
            do Just t <- getTime
               (mx,my) <- getCursorPos w
               (width,height) <- getWindowSize w
@@ -56,10 +63,6 @@ main = do
               endFrame c
               swapBuffers w
               pollEvents
-
-keyPressed :: KeyCallback
-keyPressed win GLFW.Key'Escape _ GLFW.KeyState'Pressed _ = shutdown win
-keyPressed _   _               _ _                     _ = return ()
 
 data StaticData = StaticData { fontMedium :: Font }
 
