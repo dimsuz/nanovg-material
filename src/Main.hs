@@ -52,6 +52,7 @@ main = do
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
            reactimate $ print <$> mouseE
+           reactimate $ print . ("Pressed " ++ ) . show <$> cursorPos cursor <@ filterE (\e -> buttonState e == MouseButtonState'Pressed) mouseE
          actuate network
 
          forever $
