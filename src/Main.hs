@@ -20,6 +20,16 @@ import           Foreign.Ptr
 foreign import ccall unsafe "initGlew"
   glewInit :: IO CInt
 
+type Point = (CFloat, CFloat)
+type PointB = Behavior Point
+type BoolB = Behavior Bool
+
+type CPoint = (PointB, BoolB)
+type ImageB = Behavior (IO ())
+
+toPoint :: (Double, Double) -> Point
+toPoint (x,y) = (realToFrac x, realToFrac y)
+
 main :: IO ()
 main = do
   e <- init
@@ -47,7 +57,9 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           reactimate $ (\(x,y) -> drawControlPoint c (realToFrac x) (realToFrac y) 8) <$> cursorMove cursor
+           let cpointUnderMouse = (toPoint <$> cursorPos cursor, pure False) :: CPoint
+           ePointChanged <- changes (renderCPoint c cpointUnderMouse)
+           reactimate' $ ePointChanged
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
@@ -85,6 +97,11 @@ shutdown win = do
   GLFW.terminate
   _ <- exitWith ExitSuccess
   return ()
+
+renderCPoint:: Context -> CPoint -> ImageB
+renderCPoint c (pos, excited) = renderPoint c <$> pos
+  where renderPoint c (x, y) = drawControlPoint c x y pointSize
+        pointSize = 8
 
 drawControlPoint :: Context -> CFloat -> CFloat -> CFloat -> IO ()
 drawControlPoint c x y r = do
