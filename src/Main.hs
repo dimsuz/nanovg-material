@@ -51,15 +51,19 @@ main = do
          swapInterval 0
          setTime 0
 
+         (displayHandler, runDisplay) <- newAddHandler
+
          h <- windowHandler w
          network <- compile $ do
+           displayE <- fromAddHandler displayHandler
            keyE <- keyEvent h
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
            let cpointUnderMouse = (toPoint <$> cursorPos cursor, pure False) :: CPoint
-           ePointChanged <- changes (renderCPoint c cpointUnderMouse)
-           reactimate' $ ePointChanged
+           -- ePointChanged <- changes (renderCPoint c cpointUnderMouse)
+           -- reactimate' $ ePointChanged
+           reactimate $ renderCPoint c cpointUnderMouse <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
@@ -80,6 +84,7 @@ main = do
               drawSpinner c (fromIntegral fbWidth / 2) (fromIntegral fbHeight / 2) 20 (realToFrac t)
               drawRaisedButton c (fromIntegral fbWidth / 4) (fromIntegral fbHeight / 4) 88 36
               drawControlPoint c 50 50 8
+              runDisplay t
               endFrame c
               swapBuffers w
               pollEvents
