@@ -12,7 +12,7 @@ import           Graphics.GL.Core32
 import           System.Exit ( exitWith, ExitCode(..) )
 import           Reactive.Banana as R
 import           Reactive.Banana.Frameworks
-import           Reactive.Banana.GLFW
+import           Reactive.Banana.GLFW as RGLFW
 
 import           Foreign.C.Types
 import           Foreign.Ptr
@@ -29,6 +29,10 @@ type ImageB = Behavior (IO ())
 
 toPoint :: (Double, Double) -> Point
 toPoint (x,y) = (realToFrac x, realToFrac y)
+
+mousePressPos :: RGLFW.Cursor -> Event MouseEvent -> MouseButton -> Event (Double, Double)
+mousePressPos cursor mouseE mb = cursorPos cursor <@ mouseClickE
+  where mouseClickE = filterE (\e -> press e && mouseButton e == mb) mouseE
 
 main :: IO ()
 main = do
@@ -67,8 +71,7 @@ main = do
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
            reactimate $ print <$> mouseE
-           let leftClickE = filterE press mouseE
-           reactimate $ print . ("Pressed " ++ ) . show <$> cursorPos cursor <@ leftClickE
+           reactimate $ print . ("Pressed " ++ ) . show <$> mousePressPos cursor mouseE MouseButton'1
          actuate network
 
          forever $
