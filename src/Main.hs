@@ -60,15 +60,15 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           let cpointUnderMouse = (toPoint <$> cursorPos cursor, pure False) :: CPoint
-           -- ePointChanged <- changes (renderCPoint c cpointUnderMouse)
-           -- reactimate' $ ePointChanged
+           mousePressesB <- stepper False (press <$> mouseE)
+           let cpointUnderMouse = (toPoint <$> cursorPos cursor, mousePressesB) :: CPoint
            reactimate $ renderCPoint c cpointUnderMouse <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
            reactimate $ print <$> mouseE
-           reactimate $ print . ("Pressed " ++ ) . show <$> cursorPos cursor <@ filterE (\e -> buttonState e == MouseButtonState'Pressed) mouseE
+           let leftClickE = filterE press mouseE
+           reactimate $ print . ("Pressed " ++ ) . show <$> cursorPos cursor <@ leftClickE
          actuate network
 
          forever $
@@ -83,7 +83,6 @@ main = do
               beginFrame c (fromIntegral width) (fromIntegral height) pxRatio
               drawSpinner c (fromIntegral fbWidth / 2) (fromIntegral fbHeight / 2) 20 (realToFrac t)
               drawRaisedButton c (fromIntegral fbWidth / 4) (fromIntegral fbHeight / 4) 88 36
-              drawControlPoint c 50 50 8
               runDisplay t
               endFrame c
               swapBuffers w
@@ -104,19 +103,20 @@ shutdown win = do
   return ()
 
 renderCPoint:: Context -> CPoint -> ImageB
-renderCPoint c (pos, excited) = renderPoint c <$> pos
-  where renderPoint c (x, y) = drawControlPoint c x y pointSize
+renderCPoint c (posB, excitedB) = liftA2 (renderPoint c) posB excitedB
+  where renderPoint c (x, y) excited = drawControlPoint c x y pointSize excited
         pointSize = 8
 
-drawControlPoint :: Context -> CFloat -> CFloat -> CFloat -> IO ()
-drawControlPoint c x y r = do
+drawControlPoint :: Context -> CFloat -> CFloat -> CFloat -> Bool -> IO ()
+drawControlPoint c x y r excited = do
+  let color = if excited then (rgba 255 0 0 255) else (rgba 128 0 0 255)
   beginPath c
   circle c x y (r - 3)
-  fillColor c (rgba 128 0 0 255)
+  fillColor c color
   fill c
   beginPath c
   circle c x y r
-  strokeColor c (rgba 128 0 0 255)
+  strokeColor c color
   strokeWidth c 2
   stroke c
 
