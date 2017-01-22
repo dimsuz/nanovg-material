@@ -30,9 +30,31 @@ type ImageB = Behavior (IO ())
 toPoint :: (Double, Double) -> Point
 toPoint (x,y) = (realToFrac x, realToFrac y)
 
-mousePressPos :: RGLFW.Cursor -> Event MouseEvent -> MouseButton -> Event (Double, Double)
-mousePressPos cursor mouseE mb = cursorPos cursor <@ mouseClickE
-  where mouseClickE = filterE (\e -> press e && mouseButton e == mb) mouseE
+leftMouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> Event (Double, Double)
+leftMouseReleasePos c e = mouseReleasePos c e MouseButton'1
+
+mouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> MouseButton -> Event (Double, Double)
+mouseReleasePos cursor mouseE mb = cursorPos cursor <@ mouseClickE
+  where mouseClickE = filterE (\e -> release e && mouseButton e == mb) mouseE
+
+cpointUnderMouse :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
+cpointUnderMouse cursor mouseE = do
+  mouseDownB <- stepper False (press <$> mouseE)
+  return $ (toPoint <$> cursorPos cursor, mouseDownB)
+
+cpointReleased :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
+cpointReleased cursor mouseE = do
+  let initialPos = (10.0, 10.0)
+  posB <- stepper initialPos (leftMouseReleasePos cursor mouseE)
+  return $ (toPoint <$> posB, pure False)
+
+editCPoint :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
+editCPoint cursor mouseE = do
+  (idlePosB, idleExB) <- cpointReleased cursor mouseE
+  (pressedPosB, pressedExB) <- cpointUnderMouse cursor mouseE
+  editPosB <- switchB idlePosB $ (\e -> if press e then pressedPosB else idlePosB) <$> mouseE
+  editExB <- switchB idleExB $ (\e -> if press e then pressedExB else idleExB) <$> mouseE
+  return (editPosB, editExB)
 
 main :: IO ()
 main = do
@@ -64,14 +86,13 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           mousePressesB <- stepper False (press <$> mouseE)
-           let cpointUnderMouse = (toPoint <$> cursorPos cursor, mousePressesB) :: CPoint
-           reactimate $ renderCPoint c cpointUnderMouse <@ displayE
+           cpoint <- editCPoint cursor mouseE
+           reactimate $ renderCPoint c cpoint <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
            reactimate $ print <$> keyE
            reactimate $ print <$> mouseE
-           reactimate $ print . ("Pressed " ++ ) . show <$> mousePressPos cursor mouseE MouseButton'1
+           reactimate $ print . ("Released " ++ ) . show <$> leftMouseReleasePos cursor mouseE
          actuate network
 
          forever $
