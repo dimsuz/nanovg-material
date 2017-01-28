@@ -30,12 +30,27 @@ type ImageB = Behavior (IO ())
 toPoint :: (Double, Double) -> Point
 toPoint (x,y) = (realToFrac x, realToFrac y)
 
-leftMouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> Event (Double, Double)
-leftMouseReleasePos c e = mouseReleasePos c e MouseButton'1
+isPress :: MouseButton -> MouseEvent -> Bool
+isPress mb e = press e && (mouseButton e == mb)
 
-mouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> MouseButton -> Event (Double, Double)
-mouseReleasePos cursor mouseE mb = cursorPos cursor <@ mouseClickE
-  where mouseClickE = filterE (\e -> release e && mouseButton e == mb) mouseE
+isRelease :: MouseButton -> MouseEvent -> Bool
+isRelease mb e = release e && (mouseButton e == mb)
+
+isLeftPress :: MouseEvent -> Bool
+isLeftPress = isPress MouseButton'1
+
+isLeftRelease :: MouseEvent -> Bool
+isLeftRelease = isRelease MouseButton'1
+
+leftMouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> Event (Double, Double)
+leftMouseReleasePos c e = mouseEventPos c e isLeftRelease
+
+leftMousePressPos :: RGLFW.Cursor -> Event MouseEvent -> Event (Double, Double)
+leftMousePressPos c e = mouseEventPos c e isLeftPress
+
+mouseEventPos :: RGLFW.Cursor -> Event MouseEvent -> (MouseEvent -> Bool) -> Event (Double, Double)
+mouseEventPos cursor mouseE filterPred = cursorPos cursor <@ mouseClickE
+  where mouseClickE = filterE filterPred mouseE
 
 cpointUnderMouse :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
 cpointUnderMouse cursor mouseE = do
@@ -52,8 +67,10 @@ editCPoint :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
 editCPoint cursor mouseE = do
   (idlePosB, idleExB) <- cpointReleased cursor mouseE
   (pressedPosB, pressedExB) <- cpointUnderMouse cursor mouseE
-  editPosB <- switchB idlePosB $ (\e -> if press e then pressedPosB else idlePosB) <$> mouseE
-  editExB <- switchB idleExB $ (\e -> if press e then pressedExB else idleExB) <$> mouseE
+  -- TODO need to have Event Bool which is True when mouse is pressed and is near current position, false otherwise
+  let mouseNearE = isLeftPress <$> mouseE
+  editPosB <- switchB idlePosB $ (\near -> if near then pressedPosB else idlePosB) <$> mouseNearE
+  editExB <- switchB idleExB $ (\near -> if near then pressedExB else idleExB) <$> mouseNearE
   return (editPosB, editExB)
 
 main :: IO ()
