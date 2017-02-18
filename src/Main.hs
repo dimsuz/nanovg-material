@@ -23,6 +23,7 @@ foreign import ccall unsafe "initGlew"
 type Point = (CFloat, CFloat)
 type PointB = Behavior Point
 type BoolB = Behavior Bool
+type RealB = Behavior CFloat
 
 type CPoint = (PointB, BoolB)
 type ImageB = Behavior (IO ())
@@ -67,6 +68,9 @@ cpointReleased cursor mouseE = do
 isNear :: Point -> Point -> Bool
 isNear (x1,y1) (x2,y2) = (abs (x2 - x1) < 10) && (abs (y2 - y1) < 10)
 
+cursorPos' :: RGLFW.Cursor -> PointB
+cursorPos' c = toPoint <$> cursorPos c
+
 editCPoint :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
 editCPoint cursor mouseE = do
   (idlePosB, idleExB) <- cpointReleased cursor mouseE
@@ -76,6 +80,39 @@ editCPoint cursor mouseE = do
   editPosB <- switchB idlePosB $ (\near -> if near then pressedPosB else idlePosB) <$> mouseNearPointPosE
   editExB <- switchB idleExB $ (\near -> if near then pressedExB else idleExB) <$> mouseNearPointPosE
   return (editPosB, editExB)
+
+-- editCPoint' :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
+-- editCPoint' cursor mouseE = do
+
+pointPos :: PointB
+pointPos = undefined
+
+grabbing :: RGLFW.Cursor -> Event MouseEvent -> BoolB
+grabbing cursor mouseE = undefined -- TODO stepper False grabbingE
+
+closeEnough :: RGLFW.Cursor -> BoolB
+closeEnough cursor = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
+
+grabbingE :: RGLFW.Cursor -> Event MouseEvent -> Event Bool
+grabbingE cursor mouseE = unionWith (\v1 v2 -> v2) (const True <$> grabs) (const False <$> releases)
+  where grabs = grabE cursor mouseE
+        releases = releaseE cursor mouseE
+
+grabE :: RGLFW.Cursor -> Event MouseEvent -> Event ()
+grabE cursor mouseE = const () <$> whenE (closeEnough cursor) (filterE isLeftPress mouseE)
+
+releaseE :: RGLFW.Cursor -> Event MouseEvent -> Event ()
+releaseE cursor mouseE = const () <$> whenE (grabbing cursor mouseE) (filterE isLeftRelease mouseE)
+
+grabDistance :: RealB
+grabDistance = (2 *) <$> pointSize
+
+distance2 :: PointB -> PointB -> RealB
+distance2 = liftA2 distance
+  where distance (x1, y1) (x2, y2) = sqrt ((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+
+pointSize :: RealB
+pointSize = pure 8
 
 main :: IO ()
 main = do
