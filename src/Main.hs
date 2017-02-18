@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecursiveDo #-}
 module Main where
 import           Data.Bits hiding (rotate)
 import qualified Data.Set as S
@@ -8,6 +8,7 @@ import           Graphics.UI.GLFW as GLFW hiding (Image)
 import           Control.Monad
 import           Control.Monad.Loops
 import           Control.Monad.Trans.Maybe
+import           Control.Monad.Fix
 import           Graphics.GL.Core32
 import           System.Exit ( exitWith, ExitCode(..) )
 import           Reactive.Banana as R
@@ -81,28 +82,17 @@ editCPoint cursor mouseE = do
   editExB <- switchB idleExB $ (\near -> if near then pressedExB else idleExB) <$> mouseNearPointPosE
   return (editPosB, editExB)
 
--- editCPoint' :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
--- editCPoint' cursor mouseE = do
+editCPoint' :: (MonadMoment m, MonadFix m) => RGLFW.Cursor -> Event MouseEvent -> m BoolB
+editCPoint' cursor mouseE = mdo
+  grabB <- stepper False grabbingE
+  let closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
+      grabE = const () <$> whenE closeEnough (filterE isLeftPress mouseE)
+      releaseE = const () <$> whenE grabB (filterE isLeftRelease mouseE)
+      grabbingE = unionWith (\v1 v2 -> v2) (const True <$> grabE) (const False <$> releaseE)
+  return grabB
 
 pointPos :: PointB
 pointPos = undefined
-
-grabbing :: RGLFW.Cursor -> Event MouseEvent -> BoolB
-grabbing cursor mouseE = undefined -- TODO stepper False grabbingE
-
-closeEnough :: RGLFW.Cursor -> BoolB
-closeEnough cursor = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
-
-grabbingE :: RGLFW.Cursor -> Event MouseEvent -> Event Bool
-grabbingE cursor mouseE = unionWith (\v1 v2 -> v2) (const True <$> grabs) (const False <$> releases)
-  where grabs = grabE cursor mouseE
-        releases = releaseE cursor mouseE
-
-grabE :: RGLFW.Cursor -> Event MouseEvent -> Event ()
-grabE cursor mouseE = const () <$> whenE (closeEnough cursor) (filterE isLeftPress mouseE)
-
-releaseE :: RGLFW.Cursor -> Event MouseEvent -> Event ()
-releaseE cursor mouseE = const () <$> whenE (grabbing cursor mouseE) (filterE isLeftRelease mouseE)
 
 grabDistance :: RealB
 grabDistance = (2 *) <$> pointSize
