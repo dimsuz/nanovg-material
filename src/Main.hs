@@ -64,18 +64,17 @@ traceShowP prefix v = trace (prefix ++ " " ++ show v) v
 
 editCPoint' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> m CPoint
 editCPoint' p0 cursor mouseE = mdo
-  pointPos <- ifB (mouseMove cursor) grabB (cursorPos' cursor) lastRelease
   grabB <- stepper False grabbingE
   lastRelease <- stepper p0 (pointPos <@ releaseE)
-  let closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
+  let pointPos = ifB grabB (cursorPos' cursor) lastRelease
+      closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
       grabE = const True <$> whenE closeEnough (filterE isLeftPress mouseE)
       releaseE = const False <$> whenE grabB (filterE isLeftRelease mouseE)
       grabbingE = unionWith (\v1 v2 -> v1) grabE releaseE
   return (pointPos, closeEnough)
 
-ifB :: MonadMoment m => Event b -> BoolB -> Behavior a -> Behavior a -> m (Behavior a)
-ifB trigger condB b1 b2 = switchB b2 (switcherB <@ trigger)
-  where switcherB = (\x -> if x then b1 else b2) <$> condB
+ifB :: BoolB -> Behavior a -> Behavior a -> Behavior a
+ifB condB b1 b2 = (\b t f -> if b then t else f) <$> condB <*> b1 <*> b2
 
 grabDistance :: RealB
 grabDistance = (2 *) <$> pointSize
