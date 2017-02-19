@@ -82,17 +82,20 @@ editCPoint cursor mouseE = do
   editExB <- switchB idleExB $ (\near -> if near then pressedExB else idleExB) <$> mouseNearPointPosE
   return (editPosB, editExB)
 
-editCPoint' :: (MonadMoment m, MonadFix m) => RGLFW.Cursor -> Event MouseEvent -> m BoolB
-editCPoint' cursor mouseE = mdo
+editCPoint' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> m CPoint
+editCPoint' p0 cursor mouseE = mdo
+  pointPos <- ifB mouseE grabB (cursorPos' cursor) lastRelease
   grabB <- stepper False grabbingE
+  lastRelease <- stepper p0 (pointPos <@ releaseE)
   let closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
-      grabE = const () <$> whenE closeEnough (filterE isLeftPress mouseE)
-      releaseE = const () <$> whenE grabB (filterE isLeftRelease mouseE)
-      grabbingE = unionWith (\v1 v2 -> v2) (const True <$> grabE) (const False <$> releaseE)
-  return grabB
+      grabE = const True <$> whenE closeEnough (filterE isLeftPress mouseE)
+      releaseE = const False <$> whenE grabB (filterE isLeftRelease mouseE)
+      grabbingE = unionWith (\v1 v2 -> v1) grabE releaseE
+  return (pointPos, closeEnough)
 
-pointPos :: PointB
-pointPos = undefined
+ifB :: MonadMoment m => Event b -> BoolB -> Behavior a -> Behavior a -> m (Behavior a)
+ifB trigger condB b1 b2 = switchB b2 (switcherB <@ trigger)
+  where switcherB = (\x -> if x then b1 else b2) <$> condB
 
 grabDistance :: RealB
 grabDistance = (2 *) <$> pointSize
@@ -134,7 +137,7 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           cpoint <- editCPoint cursor mouseE
+           cpoint <- editCPoint' (50.0, 50.0) cursor mouseE
            reactimate $ renderCPoint c cpoint <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
