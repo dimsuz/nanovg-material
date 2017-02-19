@@ -24,7 +24,8 @@ executable nanovg-material
                        monad-loops,
                        transformers,
                        reactive-banana,
-                       reactive-banana-glfw
+                       reactive-banana-glfw,
+                       split
 
   c-sources: cbits/glew.c
   extra-libraries: GLEW

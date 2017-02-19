@@ -14,6 +14,7 @@ import           System.Exit ( exitWith, ExitCode(..) )
 import           Reactive.Banana as R
 import           Reactive.Banana.Frameworks
 import           Reactive.Banana.GLFW as RGLFW
+import           Data.List.Split (divvy)
 import           Debug.Trace
 
 import           Foreign.C.Types
@@ -99,15 +100,20 @@ polyBezierB :: Context -> [PointB] -> ImageB
 polyBezierB context pbs = (polyBezier context) <$> sequenceA pbs
 
 polyBezier :: Context -> [Point] -> IO ()
-polyBezier c (p1 : p2 : p3 : p4 : points) = do
+polyBezier c points = do
   save c
   beginPath c
-  moveTo c (fst p1) (snd p1)
-  bezierTo c (fst p2) (snd p2) (fst p3) (snd p3) (fst p4) (snd p4)
+  sequence (map (polyBezier4 c) (divvy 4 3 points))
   strokeColor c (rgba 0 0 255 255)
   strokeWidth c 2
   stroke c
   restore c
+
+polyBezier4 :: Context -> [Point] -> IO ()
+polyBezier4 c (p1 : p2 : p3 : p4 : _) = do
+  moveTo c (fst p1) (snd p1)
+  bezierTo c (fst p2) (snd p2) (fst p3) (snd p3) (fst p4) (snd p4)
+
 
 main :: IO ()
 main = do
@@ -143,7 +149,10 @@ main = do
            cpoint2 <- editCPoint' (150.0, 250.0) cursor mouseE
            cpoint3 <- editCPoint' (250.0, 350.0) cursor mouseE
            cpoint4 <- editCPoint' (350.0, 50.0) cursor mouseE
-           reactimate $ renderCurve c [cpoint1, cpoint2, cpoint3, cpoint4] <@ displayE
+           cpoint5 <- editCPoint' (360.0, 20.0) cursor mouseE
+           cpoint6 <- editCPoint' (370.0, 70.0) cursor mouseE
+           cpoint7 <- editCPoint' (380.0, 30.0) cursor mouseE
+           reactimate $ renderCurve c [cpoint1, cpoint2, cpoint3, cpoint4, cpoint5, cpoint6, cpoint7] <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
          actuate network
