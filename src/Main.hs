@@ -14,6 +14,7 @@ import           System.Exit ( exitWith, ExitCode(..) )
 import           Reactive.Banana as R
 import           Reactive.Banana.Frameworks
 import           Reactive.Banana.GLFW as RGLFW
+import           Debug.Trace
 
 import           Foreign.C.Types
 import           Foreign.Ptr
@@ -55,36 +56,15 @@ mouseEventPos cursor mouseE filterPred = toPoint <$> mouseEDouble
   where mouseEDouble = cursorPos cursor <@ mouseClickE
         mouseClickE = filterE filterPred mouseE
 
-cpointUnderMouse :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
-cpointUnderMouse cursor mouseE = do
-  mouseDownB <- stepper False (press <$> mouseE)
-  return $ (toPoint <$> cursorPos cursor, mouseDownB)
-
-cpointReleased :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
-cpointReleased cursor mouseE = do
-  let initialPos = (10.0, 10.0)
-  posB <- stepper initialPos (leftMouseReleasePos cursor mouseE)
-  return $ (posB, pure False)
-
-isNear :: Point -> Point -> Bool
-isNear (x1,y1) (x2,y2) = (abs (x2 - x1) < 10) && (abs (y2 - y1) < 10)
-
 cursorPos' :: RGLFW.Cursor -> PointB
 cursorPos' c = toPoint <$> cursorPos c
 
-editCPoint :: MonadMoment m => RGLFW.Cursor -> Event MouseEvent -> m CPoint
-editCPoint cursor mouseE = do
-  (idlePosB, idleExB) <- cpointReleased cursor mouseE
-  (pressedPosB, pressedExB) <- cpointUnderMouse cursor mouseE
-  --let mousePressE = isLeftPress <$> mouseE
-  let mouseNearPointPosE = (isNear <$> idlePosB) <@> (mouseEventPos cursor mouseE (const True))
-  editPosB <- switchB idlePosB $ (\near -> if near then pressedPosB else idlePosB) <$> mouseNearPointPosE
-  editExB <- switchB idleExB $ (\near -> if near then pressedExB else idleExB) <$> mouseNearPointPosE
-  return (editPosB, editExB)
+traceShowP :: Show a => String -> a -> a
+traceShowP prefix v = trace (prefix ++ " " ++ show v) v
 
 editCPoint' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> m CPoint
 editCPoint' p0 cursor mouseE = mdo
-  pointPos <- ifB mouseE grabB (cursorPos' cursor) lastRelease
+  pointPos <- ifB (mouseMove cursor) grabB (cursorPos' cursor) lastRelease
   grabB <- stepper False grabbingE
   lastRelease <- stepper p0 (pointPos <@ releaseE)
   let closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
@@ -137,13 +117,12 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           cpoint <- editCPoint' (50.0, 50.0) cursor mouseE
-           reactimate $ renderCPoint c cpoint <@ displayE
+           cpoint1 <- editCPoint' (50.0, 50.0) cursor mouseE
+           cpoint2 <- editCPoint' (150.0, 250.0) cursor mouseE
+           reactimate $ renderCPoint c cpoint1 <@ displayE
+           reactimate $ renderCPoint c cpoint2 <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
-           reactimate $ print <$> keyE
-           reactimate $ print <$> mouseE
-           reactimate $ print . ("Released " ++ ) . show <$> leftMouseReleasePos cursor mouseE
          actuate network
 
          forever $
