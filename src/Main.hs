@@ -86,6 +86,15 @@ distance2 = liftA2 distance
 pointSize :: RealB
 pointSize = pure 8
 
+over :: ImageB -> ImageB -> ImageB
+over b1 b2 = (>>) <$> b1 <*> b2
+
+overs :: [ImageB] -> ImageB
+overs bs = sequence_ <$> sequenceA bs
+
+renderCurve :: Context -> [CPoint] -> ImageB
+renderCurve context cpoints = overs $ map (renderCPoint context) cpoints
+
 main :: IO ()
 main = do
   e <- init
@@ -118,8 +127,7 @@ main = do
            cursor <- cursor h TopLeft
            cpoint1 <- editCPoint' (50.0, 50.0) cursor mouseE
            cpoint2 <- editCPoint' (150.0, 250.0) cursor mouseE
-           reactimate $ renderCPoint c cpoint1 <@ displayE
-           reactimate $ renderCPoint c cpoint2 <@ displayE
+           reactimate $ renderCurve c [cpoint1, cpoint2] <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
          actuate network
