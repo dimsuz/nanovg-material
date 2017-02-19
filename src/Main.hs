@@ -93,7 +93,21 @@ overs :: [ImageB] -> ImageB
 overs bs = sequence_ <$> sequenceA bs
 
 renderCurve :: Context -> [CPoint] -> ImageB
-renderCurve context cpoints = overs $ map (renderCPoint context) cpoints
+renderCurve context cpoints = (overs $ map (renderCPoint context) cpoints) `over` (polyBezierB context (map fst cpoints))
+
+polyBezierB :: Context -> [PointB] -> ImageB
+polyBezierB context pbs = (polyBezier context) <$> sequenceA pbs
+
+polyBezier :: Context -> [Point] -> IO ()
+polyBezier c (p1 : p2 : p3 : p4 : points) = do
+  save c
+  beginPath c
+  moveTo c (fst p1) (snd p1)
+  bezierTo c (fst p2) (snd p2) (fst p3) (snd p3) (fst p4) (snd p4)
+  strokeColor c (rgba 0 0 255 255)
+  strokeWidth c 2
+  stroke c
+  restore c
 
 main :: IO ()
 main = do
@@ -127,7 +141,9 @@ main = do
            cursor <- cursor h TopLeft
            cpoint1 <- editCPoint' (50.0, 50.0) cursor mouseE
            cpoint2 <- editCPoint' (150.0, 250.0) cursor mouseE
-           reactimate $ renderCurve c [cpoint1, cpoint2] <@ displayE
+           cpoint3 <- editCPoint' (250.0, 350.0) cursor mouseE
+           cpoint4 <- editCPoint' (350.0, 50.0) cursor mouseE
+           reactimate $ renderCurve c [cpoint1, cpoint2, cpoint3, cpoint4] <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
          actuate network
