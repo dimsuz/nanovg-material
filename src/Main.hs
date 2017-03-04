@@ -46,6 +46,9 @@ isLeftPress = isPress MouseButton'1
 isLeftRelease :: MouseEvent -> Bool
 isLeftRelease = isRelease MouseButton'1
 
+isRightRelease :: MouseEvent -> Bool
+isRightRelease = isRelease MouseButton'2
+
 leftMouseReleasePos :: RGLFW.Cursor -> Event MouseEvent -> Event Point
 leftMouseReleasePos c e = mouseEventPos c e isLeftRelease
 
@@ -66,13 +69,27 @@ traceShowP prefix v = trace (prefix ++ " " ++ show v) v
 editCPoint' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> m CPoint
 editCPoint' p0 cursor mouseE = mdo
   grabB <- stepper False grabbingE
-  lastRelease <- stepper p0 (pointPos <@ releaseE)
+  lastRelease <- stepper p0 $ (pointPos <@ releaseE) `union` undo
+  undo <- stacker grabPos (const (traceShowP "tryPop" ()) <$> filterE isRightRelease mouseE)
   let pointPos = ifB grabB (cursorPos' cursor) lastRelease
       closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
       grabE = const True <$> whenE closeEnough (filterE isLeftPress mouseE)
       releaseE = const False <$> whenE grabB (filterE isLeftRelease mouseE)
       grabbingE = unionWith (\v1 v2 -> v1) grabE releaseE
+      grabPos :: Event Point
+      grabPos = cursorPos' cursor <@ grabE
   return (pointPos, closeEnough)
+
+stacker :: (MonadMoment m, MonadFix m) => Event a -> Event () -> m (Event a)
+stacker push tryPop = mdo
+  stack <- accumB [] changeStack
+  -- legitPop :: Event ()
+  -- changeStack :: Event ([a] -> [a])
+  let legitPop = ((not . null) <$> stack) `whenE` tryPop
+      changeStack = (const tail <$> legitPop) `union` ((:) <$> push)
+  return $ (head <$> stack) <@ legitPop
+
+union = unionWith (\a b -> a)
 
 ifB :: BoolB -> Behavior a -> Behavior a -> Behavior a
 ifB condB b1 b2 = (\b t f -> if b then t else f) <$> condB <*> b1 <*> b2
