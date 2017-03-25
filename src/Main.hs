@@ -66,11 +66,10 @@ cursorPos' c = toPoint <$> cursorPos c
 traceShowP :: Show a => String -> a -> a
 traceShowP prefix v = trace (prefix ++ " " ++ show v) v
 
-editCPoint' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> m CPoint
-editCPoint' p0 cursor mouseE = mdo
+editCPointUndo' :: (MonadMoment m, MonadFix m) => Point -> RGLFW.Cursor -> Event MouseEvent -> Event Point -> m (CPoint, Event Point)
+editCPointUndo' p0 cursor mouseE undoE = mdo
   grabB <- stepper False grabbingE
-  lastRelease <- stepper p0 $ (pointPos <@ releaseE) `union` undo
-  undo <- stacker grabPos (const (traceShowP "tryPop" ()) <$> filterE isRightRelease mouseE)
+  lastRelease <- stepper p0 $ (pointPos <@ releaseE) `union` undoE
   let pointPos = ifB grabB (cursorPos' cursor) lastRelease
       closeEnough = (<) <$> distance2 pointPos (cursorPos' cursor) <*> grabDistance
       grabE = const True <$> whenE closeEnough (filterE isLeftPress mouseE)
@@ -78,7 +77,10 @@ editCPoint' p0 cursor mouseE = mdo
       grabbingE = unionWith (\v1 v2 -> v1) grabE releaseE
       grabPos :: Event Point
       grabPos = cursorPos' cursor <@ grabE
-  return (pointPos, closeEnough)
+  return ((pointPos, closeEnough), grabPos)
+
+editCurveUndo :: (MonadMoment m, MonadFix m) => [Point] -> RGLFW.Cursor -> Event MouseEvent -> m [CPoint]
+editCurveUndo = undefined
 
 stacker :: (MonadMoment m, MonadFix m) => Event a -> Event () -> m (Event a)
 stacker push tryPop = mdo
@@ -162,14 +164,9 @@ main = do
            mouseE <- mouseEvent h
            closeE <- close h
            cursor <- cursor h TopLeft
-           cpoint1 <- editCPoint' (50.0, 50.0) cursor mouseE
-           cpoint2 <- editCPoint' (150.0, 250.0) cursor mouseE
-           cpoint3 <- editCPoint' (250.0, 350.0) cursor mouseE
-           cpoint4 <- editCPoint' (350.0, 50.0) cursor mouseE
-           cpoint5 <- editCPoint' (360.0, 20.0) cursor mouseE
-           cpoint6 <- editCPoint' (370.0, 70.0) cursor mouseE
-           cpoint7 <- editCPoint' (380.0, 30.0) cursor mouseE
-           reactimate $ renderCurve c [cpoint1, cpoint2, cpoint3, cpoint4, cpoint5, cpoint6, cpoint7] <@ displayE
+           let initPoints = [(50.0, 50.0), (150.0, 250.0), (250.0, 350.0), (350.0, 50.0), (360.0, 20.0), (370.0, 70.0), (380.0, 30.0)]
+           points <- editCurveUndo initPoints cursor mouseE
+           reactimate $ renderCurve c points <@ displayE
            reactimate $ shutdown w <$ filterE (match Key'Escape) keyE
            reactimate $ shutdown w <$ closeE
          actuate network
