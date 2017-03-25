@@ -79,8 +79,23 @@ editCPointUndo' p0 cursor mouseE undoE = mdo
       grabPos = cursorPos' cursor <@ grabE
   return ((pointPos, closeEnough), grabPos)
 
+type UndoRecord = (Int, Point)
+
 editCurveUndo :: (MonadMoment m, MonadFix m) => [Point] -> RGLFW.Cursor -> Event MouseEvent -> m [CPoint]
-editCurveUndo = undefined
+editCurveUndo initPoints cursor mouseE = mdo
+  undo <- stacker curveGrab (const () <$> filterE isRightRelease mouseE)
+  -- editCP :: Int -> Point -> (CPoint, Event Point)
+  -- Tag and merge CPoint grab events
+  let curveGrab :: Event UndoRecord
+      curveGrab = anyE (zipWith (\i e -> (,) i <$> e) indices pointGrabs)
+      indices = [1 .. length initPoints]
+      pointGrabs :: [Event Point]
+      pointGrabs = undefined
+      editCP :: Int -> Point -> (CPoint, Event Point)
+      editCP i p0 = editCPointUndo' p0 cursor mouseE undoThis
+        where undoThis = undo -- TODO stopped here: need to implement "suchThat"
+  return []
+
 
 stacker :: (MonadMoment m, MonadFix m) => Event a -> Event () -> m (Event a)
 stacker push tryPop = mdo
@@ -95,6 +110,10 @@ union = unionWith (\a b -> a)
 
 ifB :: BoolB -> Behavior a -> Behavior a -> Behavior a
 ifB condB b1 b2 = (\b t f -> if b then t else f) <$> condB <*> b1 <*> b2
+
+anyE :: [Event a] -> Event a
+anyE [] = never
+aneE xs = foldr1 union xs
 
 grabDistance :: RealB
 grabDistance = (2 *) <$> pointSize
