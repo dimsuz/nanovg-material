@@ -83,19 +83,19 @@ type UndoRecord = (Int, Point)
 
 editCurveUndo :: (MonadMoment m, MonadFix m) => [Point] -> RGLFW.Cursor -> Event MouseEvent -> m [CPoint]
 editCurveUndo initPoints cursor mouseE = mdo
+  -- undo :: Event UndoRecord
   undo <- stacker curveGrab (const () <$> filterE isRightRelease mouseE)
-  -- editCP :: Int -> Point -> (CPoint, Event Point)
+  -- I suspect sequenceA here is causing the blocking
+  (cpoints, pointGrabs) <- unzip <$> sequenceA (zipWith editCP indices initPoints)
   -- Tag and merge CPoint grab events
   let curveGrab :: Event UndoRecord
       curveGrab = anyE (zipWith (\i e -> (,) i <$> e) indices pointGrabs)
       indices = [1 .. length initPoints]
-      pointGrabs :: [Event Point]
-      pointGrabs = undefined
-      editCP :: Int -> Point -> (CPoint, Event Point)
+      -- editCP :: Int -> Point -> m (CPoint, Event Point)
       editCP i p0 = editCPointUndo' p0 cursor mouseE undoThis
-        where undoThis = undo -- TODO stopped here: need to implement "suchThat"
-  return []
-
+        -- undoThis :: Event Point
+        where undoThis = snd <$> (((==i) . fst) `filterE` undo)
+  return cpoints
 
 stacker :: (MonadMoment m, MonadFix m) => Event a -> Event () -> m (Event a)
 stacker push tryPop = mdo
@@ -113,7 +113,7 @@ ifB condB b1 b2 = (\b t f -> if b then t else f) <$> condB <*> b1 <*> b2
 
 anyE :: [Event a] -> Event a
 anyE [] = never
-aneE xs = foldr1 union xs
+anyE xs = foldr1 union xs
 
 grabDistance :: RealB
 grabDistance = (2 *) <$> pointSize
